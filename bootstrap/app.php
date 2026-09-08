@@ -24,5 +24,15 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Keep the root cause visible in serverless logs before a long stack
+        // trace is truncated by the hosting log viewer.
+        $exceptions->report(function (Throwable $exception): void {
+            error_log(sprintf(
+                '[Laravel exception] %s: %s in %s:%d',
+                $exception::class,
+                substr($exception->getMessage(), 0, 2000),
+                $exception->getFile(),
+                $exception->getLine(),
+            ));
+        });
     })->create();
