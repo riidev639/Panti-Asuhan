@@ -61,6 +61,7 @@ if (getenv('VERCEL') !== false) {
         'LOG_CHANNEL' => 'null',
         'LOG_STACK' => 'null',
         'CACHE_STORE' => 'array',
+        'APP_MAINTENANCE_DRIVER' => 'file',
         'SESSION_DRIVER' => 'cookie',
         'SESSION_ENCRYPT' => 'true',
         'VIEW_COMPILED_PATH' => $storagePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'views',
