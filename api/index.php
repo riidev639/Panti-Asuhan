@@ -84,6 +84,55 @@ if (getenv('VERCEL') !== false) {
         $_ENV[$name] = $value;
         $_SERVER[$name] = $value;
     }
+
+    if (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) === '/__deployment-diagnostic') {
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+
+        $stage = 'autoload';
+
+        try {
+            require_once __DIR__.'/../vendor/autoload.php';
+
+            $stage = 'application';
+            $application = require __DIR__.'/../bootstrap/app.php';
+
+            $stage = 'bootstrap';
+            $kernel = $application->make(Illuminate\Contracts\Http\Kernel::class);
+            $kernel->bootstrap();
+
+            $stage = 'database';
+            Illuminate\Support\Facades\DB::select('select 1');
+
+            $stage = 'routes';
+            Illuminate\Support\Facades\Route::getRoutes()->count();
+
+            $stage = 'view';
+            view('members.index')->render();
+
+            echo json_encode([
+                'ok' => true,
+                'stage' => 'complete',
+                'pdo_mysql' => extension_loaded('pdo_mysql'),
+            ], JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            http_response_code(500);
+            error_log(sprintf(
+                '[Deployment diagnostic] stage=%s exception=%s message=%s',
+                $stage,
+                $exception::class,
+                $exception->getMessage(),
+            ));
+
+            echo json_encode([
+                'ok' => false,
+                'stage' => $stage,
+                'exception' => $exception::class,
+            ], JSON_THROW_ON_ERROR);
+        }
+
+        exit;
+    }
 }
 
 require __DIR__.'/../public/index.php';
