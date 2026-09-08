@@ -80,7 +80,9 @@
             @endif
 
 
-            <form action="{{ route('videos.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+            <form action="{{ route('videos.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5"
+                  data-blob-upload="video"
+                  data-blob-enabled="{{ config('services.vercel_blob.token') && config('services.vercel_blob.store_id') ? '1' : '0' }}">
                 @csrf
 
                 <div>
@@ -153,6 +155,9 @@
 
                 </div>
 
+
+                <p data-upload-progress class="hidden text-sm text-goldLight" aria-live="polite"></p>
+                <p data-upload-error class="hidden rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></p>
 
                 <div class="flex flex-col gap-3 pt-3 sm:flex-row">
 

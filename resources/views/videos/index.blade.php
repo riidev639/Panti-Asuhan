@@ -375,7 +375,7 @@
                         <div class="video-thumbnail relative aspect-video overflow-hidden">
 
                             <video
-                                src="{{ asset('storage/' . $video->path) }}"
+                                src="{{ $video->url }}"
                                 muted
                                 playsinline
                                 preload="metadata"
@@ -686,7 +686,7 @@
         const videos = [
             @foreach ($videos ?? [] as $video)
                 {
-                    video: @json(asset('storage/' . $video->path)),
+                    video: @json($video->url),
                     title: @json($video->title),
                     description: @json($video->description ?? 'Tidak ada deskripsi.'),
                     uploader: @json($video->user?->username ?? 'Unknown'),

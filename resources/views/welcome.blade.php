@@ -421,7 +421,7 @@
                             <div class="aspect-[4/3] overflow-hidden">
 
                                 <img
-                                    src="{{ asset('storage/' . $photo->path) }}"
+                                    src="{{ $photo->url }}"
                                     alt="{{ $photo->title ?? 'Foto Kenangan' }}"
                                     class="h-full w-full object-cover">
 
@@ -532,7 +532,7 @@
                             <div class="relative aspect-video overflow-hidden rounded-xl bg-black/40">
 
                                 <video
-                                    src="{{ asset('storage/' . $video->path) }}"
+                                    src="{{ $video->url }}"
                                     muted
                                     playsinline
                                     preload="metadata"
@@ -967,7 +967,7 @@
         const latestVideos = [
             @foreach ($latestVideos ?? [] as $video)
                 {
-                    video: @json(asset('storage/' . $video->path)),
+                    video: @json($video->url),
                     title: @json($video->title ?? 'Video Kenangan'),
                     description: @json($video->description ?? 'Tidak ada deskripsi.'),
                     uploader: @json($video->user?->username ?? 'Unknown'),

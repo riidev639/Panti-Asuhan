@@ -56,6 +56,7 @@ Route::get('/timeline', function () {
                 'title' => $photo->title,
                 'description' => $photo->description,
                 'path' => $photo->path,
+                'url' => $photo->url,
                 'username' => $photo->user?->username ?? 'Unknown',
                 'created_at' => $photo->created_at,
             ];
@@ -70,6 +71,7 @@ Route::get('/timeline', function () {
                 'title' => $video->title,
                 'description' => $video->description,
                 'path' => $video->path,
+                'url' => $video->url,
                 'username' => $video->user?->username ?? 'Unknown',
                 'created_at' => $video->created_at,
             ];
@@ -97,6 +99,10 @@ Route::middleware('guest')->group(function () {
 // ================= MEMBER AREA =================
 
 Route::middleware('auth')->group(function () {
+
+    Route::get('/_internal/blob-authorize', function () {
+        return response()->noContent();
+    })->middleware('throttle:120,1');
 
     Route::get('/dashboard', function () {
         return view('dashboard');

@@ -109,7 +109,9 @@
                 <form action="{{ route('videos.update', $video->id) }}"
                       method="POST"
                       enctype="multipart/form-data"
-                      class="space-y-6">
+                      class="space-y-6"
+                      data-blob-upload="video"
+                      data-blob-enabled="{{ config('services.vercel_blob.token') && config('services.vercel_blob.store_id') ? '1' : '0' }}">
 
                     @csrf
                     @method('PUT')
@@ -151,7 +153,7 @@
                         </label>
 
                         <video
-                            src="{{ asset('storage/' . $video->path) }}"
+                            src="{{ $video->url }}"
                             controls
                             class="w-full rounded-2xl border border-white/10 bg-black">
                         </video>
@@ -191,6 +193,9 @@
 
 
                     <!-- BUTTON -->
+                    <p data-upload-progress class="hidden text-sm text-goldLight" aria-live="polite"></p>
+                    <p data-upload-error class="hidden rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></p>
+
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
 
                         <a href="{{ route('videos.index') }}"

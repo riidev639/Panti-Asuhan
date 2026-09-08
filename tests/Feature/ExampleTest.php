@@ -8,6 +8,7 @@ use App\Models\Video;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -164,5 +165,106 @@ class ExampleTest extends TestCase
 
         $this->assertDatabaseMissing('videos', ['id' => $video->id]);
         Storage::disk('public')->assertMissing($path);
+    }
+
+    public function test_authenticated_member_can_use_persistent_blob_photo_crud(): void
+    {
+        $this->configureBlobStorage();
+        Http::fake(['https://vercel.com/api/blob/delete' => Http::response([], 200)]);
+        $user = User::factory()->create();
+
+        $firstUrl = 'https://teststore.public.blob.vercel-storage.com/photos/first.png';
+        $this->actingAs($user)->post(route('photos.store'), [
+            'title' => 'Foto Blob',
+            'description' => 'Tersimpan permanen',
+            'blob_url' => $firstUrl,
+            'blob_pathname' => 'photos/first.png',
+            'blob_mime_type' => 'image/png',
+            'blob_size' => 1024,
+        ])->assertRedirect(route('photos.index'));
+
+        $photo = Photo::firstOrFail();
+        $this->assertSame($firstUrl, $photo->path);
+        $this->assertSame($firstUrl, $photo->url);
+
+        $secondUrl = 'https://teststore.public.blob.vercel-storage.com/photos/second.webp';
+        $this->actingAs($user)->put(route('photos.update', $photo), [
+            'title' => 'Foto Blob Diperbarui',
+            'description' => 'File pengganti',
+            'blob_url' => $secondUrl,
+            'blob_pathname' => 'photos/second.webp',
+            'blob_mime_type' => 'image/webp',
+            'blob_size' => 2048,
+        ])->assertRedirect(route('photos.index'));
+
+        $this->assertSame($secondUrl, $photo->fresh()->path);
+
+        $this->actingAs($user)
+            ->delete(route('photos.destroy', $photo))
+            ->assertRedirect(route('photos.index'));
+
+        $this->assertDatabaseMissing('photos', ['id' => $photo->id]);
+        Http::assertSentCount(2);
+    }
+
+    public function test_authenticated_member_can_use_persistent_blob_video_crud(): void
+    {
+        $this->configureBlobStorage();
+        Http::fake(['https://vercel.com/api/blob/delete' => Http::response([], 200)]);
+        $user = User::factory()->create();
+        $url = 'https://teststore.public.blob.vercel-storage.com/videos/memory.mp4';
+
+        $this->actingAs($user)->post(route('videos.store'), [
+            'title' => 'Video Blob',
+            'description' => 'Tersimpan permanen',
+            'blob_url' => $url,
+            'blob_pathname' => 'videos/memory.mp4',
+            'blob_mime_type' => 'video/mp4',
+            'blob_size' => 4096,
+            'blob_original_name' => 'memory.mp4',
+        ])->assertRedirect(route('videos.index'));
+
+        $video = Video::firstOrFail();
+        $this->assertSame($url, $video->path);
+        $this->assertSame($url, $video->url);
+        $this->assertSame('video/mp4', $video->mime_type);
+
+        $this->actingAs($user)->put(route('videos.update', $video), [
+            'title' => 'Video Blob Diperbarui',
+            'description' => 'Deskripsi baru',
+        ])->assertRedirect(route('videos.index'));
+
+        $this->assertSame('Video Blob Diperbarui', $video->fresh()->title);
+
+        $this->actingAs($user)
+            ->delete(route('videos.destroy', $video))
+            ->assertRedirect(route('videos.index'));
+
+        $this->assertDatabaseMissing('videos', ['id' => $video->id]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_blob_metadata_from_another_store_is_rejected(): void
+    {
+        $this->configureBlobStorage();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('photos.store'), [
+            'title' => 'Foto tidak sah',
+            'blob_url' => 'https://otherstore.public.blob.vercel-storage.com/photos/file.png',
+            'blob_pathname' => 'photos/file.png',
+            'blob_mime_type' => 'image/png',
+            'blob_size' => 1024,
+        ])->assertSessionHasErrors('photo');
+
+        $this->assertDatabaseCount('photos', 0);
+    }
+
+    private function configureBlobStorage(): void
+    {
+        config([
+            'services.vercel_blob.token' => 'vercel_blob_rw_teststore_secret',
+            'services.vercel_blob.store_id' => 'store_teststore',
+        ]);
     }
 }

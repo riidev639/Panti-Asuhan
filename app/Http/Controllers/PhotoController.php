@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Photo;
+use App\Services\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -34,17 +35,22 @@ class PhotoController extends Controller
     /**
      * Menyimpan foto baru.
      */
-    public function store(Request $request)
+    public function store(Request $request, MediaStorage $mediaStorage)
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
             'photo' => [
-                'required',
+                'nullable',
+                'required_without:blob_url',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
                 'max:10240',
             ],
+            'blob_url' => ['nullable', 'required_without:photo', 'url:https', 'max:2048'],
+            'blob_pathname' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
+            'blob_mime_type' => ['nullable', 'required_with:blob_url', 'in:image/jpeg,image/png,image/webp'],
+            'blob_size' => ['nullable', 'required_with:blob_url', 'integer', 'min:1', 'max:10485760'],
         ], [
             'title.required' => 'Judul foto wajib diisi.',
             'photo.required' => 'Silakan pilih foto terlebih dahulu.',
@@ -53,18 +59,32 @@ class PhotoController extends Controller
             'photo.max' => 'Ukuran foto maksimal 10 MB.',
         ]);
 
-        try {
-            $path = $request->file('photo')->store('photos', 'public');
-
-            if ($path === false) {
-                throw new RuntimeException('Foto gagal disimpan ke storage public.');
+        if ($request->filled('blob_url')) {
+            if (! $mediaStorage->isValidBlobUpload(
+                $validated['blob_url'],
+                $validated['blob_pathname'],
+                'photos',
+            )) {
+                throw ValidationException::withMessages([
+                    'photo' => 'Hasil upload foto tidak valid. Silakan pilih file dan coba lagi.',
+                ]);
             }
-        } catch (Throwable $exception) {
-            report($exception);
 
-            return back()
-                ->withErrors(['photo' => 'Foto gagal disimpan. Periksa izin folder storage lalu coba lagi.'])
-                ->withInput();
+            $path = $validated['blob_url'];
+        } else {
+            try {
+                $path = $request->file('photo')->store('photos', 'public');
+
+                if ($path === false) {
+                    throw new RuntimeException('Foto gagal disimpan ke storage public.');
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()
+                    ->withErrors(['photo' => 'Foto gagal disimpan. Periksa izin folder storage lalu coba lagi.'])
+                    ->withInput();
+            }
         }
 
         try {
@@ -75,7 +95,7 @@ class PhotoController extends Controller
                 'path' => $path,
             ]);
         } catch (Throwable $exception) {
-            Storage::disk('public')->delete($path);
+            $this->cleanupFile($mediaStorage, $path);
 
             throw $exception;
         }
@@ -98,7 +118,7 @@ class PhotoController extends Controller
     /**
      * Memperbarui foto.
      */
-    public function update(Request $request, Photo $photo)
+    public function update(Request $request, Photo $photo, MediaStorage $mediaStorage)
     {
         // Hanya pemilik foto yang boleh mengedit.
         abort_unless($photo->user_id === Auth::id(), 403);
@@ -112,13 +132,29 @@ class PhotoController extends Controller
                 'mimes:jpg,jpeg,png,webp',
                 'max:10240',
             ],
+            'blob_url' => ['nullable', 'url:https', 'max:2048'],
+            'blob_pathname' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
+            'blob_mime_type' => ['nullable', 'required_with:blob_url', 'in:image/jpeg,image/png,image/webp'],
+            'blob_size' => ['nullable', 'required_with:blob_url', 'integer', 'min:1', 'max:10485760'],
         ]);
 
         $newPath = null;
 
         // Kalau user memilih foto baru, simpan dahulu agar file lama tetap aman
         // jika proses upload gagal.
-        if ($request->hasFile('photo')) {
+        if ($request->filled('blob_url')) {
+            if (! $mediaStorage->isValidBlobUpload(
+                $validated['blob_url'],
+                $validated['blob_pathname'],
+                'photos',
+            )) {
+                throw ValidationException::withMessages([
+                    'photo' => 'Hasil upload foto baru tidak valid. Silakan coba lagi.',
+                ]);
+            }
+
+            $newPath = $validated['blob_url'];
+        } elseif ($request->hasFile('photo')) {
             try {
                 $newPath = $request->file('photo')->store('photos', 'public');
 
@@ -146,14 +182,14 @@ class PhotoController extends Controller
             $photo->save();
         } catch (Throwable $exception) {
             if ($newPath !== null) {
-                Storage::disk('public')->delete($newPath);
+                $this->cleanupFile($mediaStorage, $newPath);
             }
 
             throw $exception;
         }
 
         if ($newPath !== null) {
-            Storage::disk('public')->delete($oldPath);
+            $this->cleanupFile($mediaStorage, $oldPath);
         }
 
         return redirect()->route('photos.index')
@@ -163,7 +199,7 @@ class PhotoController extends Controller
     /**
      * Menghapus foto.
      */
-    public function destroy(Photo $photo)
+    public function destroy(Photo $photo, MediaStorage $mediaStorage)
     {
         // Hanya pemilik foto yang boleh menghapus.
         abort_unless($photo->user_id === Auth::id(), 403);
@@ -173,9 +209,18 @@ class PhotoController extends Controller
 
         // Data dihapus dahulu. Jika pembersihan file gagal, galeri tetap tidak
         // menyimpan referensi menuju file yang sudah hilang.
-        Storage::disk('public')->delete($path);
+        $this->cleanupFile($mediaStorage, $path);
 
         return redirect()->route('photos.index')
             ->with('success', 'Foto berhasil dihapus! 🗑️');
+    }
+
+    private function cleanupFile(MediaStorage $mediaStorage, ?string $path): void
+    {
+        try {
+            $mediaStorage->delete($path);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

@@ -132,7 +132,9 @@
                 <form
                     action="{{ route('photos.update', $photo) }}"
                     method="POST"
-                    enctype="multipart/form-data">
+                    enctype="multipart/form-data"
+                    data-blob-upload="photo"
+                    data-blob-enabled="{{ config('services.vercel_blob.token') && config('services.vercel_blob.store_id') ? '1' : '0' }}">
 
                     @csrf
                     @method('PUT')
@@ -150,7 +152,7 @@
                                     border border-white/10 bg-black/30">
 
                             <img
-                                src="{{ asset('storage/' . $photo->path) }}"
+                                src="{{ $photo->url }}"
                                 alt="{{ $photo->title }}"
                                 class="max-h-[400px] w-full object-contain">
 
@@ -240,6 +242,9 @@
 
 
                     <!-- BUTTON -->
+                    <p data-upload-progress class="mb-3 hidden text-sm text-goldLight" aria-live="polite"></p>
+                    <p data-upload-error class="mb-3 hidden rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></p>
+
                     <div class="flex flex-col gap-3 sm:flex-row">
 
                         <a

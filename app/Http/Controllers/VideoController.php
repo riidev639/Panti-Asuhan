@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Video;
+use App\Services\MediaStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -25,12 +26,17 @@ class VideoController extends Controller
         return view('videos.create');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, MediaStorage $mediaStorage)
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'video' => ['required', 'file', 'mimes:mp4,mov,webm,mkv', 'max:30720'],
+            'video' => ['nullable', 'required_without:blob_url', 'file', 'mimes:mp4,mov,webm,mkv', 'max:30720'],
+            'blob_url' => ['nullable', 'required_without:video', 'url:https', 'max:2048'],
+            'blob_pathname' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
+            'blob_mime_type' => ['nullable', 'required_with:blob_url', 'in:video/mp4,video/quicktime,video/webm,video/x-matroska'],
+            'blob_size' => ['nullable', 'required_with:blob_url', 'integer', 'min:1', 'max:31457280'],
+            'blob_original_name' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
         ], [
             'title.required' => 'Judul video wajib diisi.',
             'video.required' => 'File video wajib dipilih.',
@@ -40,18 +46,39 @@ class VideoController extends Controller
 
         $file = $request->file('video');
 
-        try {
-            $path = $file->store('videos', 'public');
-
-            if ($path === false) {
-                throw new RuntimeException('Video gagal disimpan ke storage public.');
+        if ($request->filled('blob_url')) {
+            if (! $mediaStorage->isValidBlobUpload(
+                $validated['blob_url'],
+                $validated['blob_pathname'],
+                'videos',
+            )) {
+                throw ValidationException::withMessages([
+                    'video' => 'Hasil upload video tidak valid. Silakan pilih file dan coba lagi.',
+                ]);
             }
-        } catch (Throwable $exception) {
-            report($exception);
 
-            return back()
-                ->withErrors(['video' => 'Video gagal disimpan. Periksa izin folder storage lalu coba lagi.'])
-                ->withInput();
+            $path = $validated['blob_url'];
+            $originalName = $validated['blob_original_name'];
+            $mimeType = $validated['blob_mime_type'];
+            $size = (int) $validated['blob_size'];
+        } else {
+            try {
+                $path = $file->store('videos', 'public');
+
+                if ($path === false) {
+                    throw new RuntimeException('Video gagal disimpan ke storage public.');
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()
+                    ->withErrors(['video' => 'Video gagal disimpan. Periksa izin folder storage lalu coba lagi.'])
+                    ->withInput();
+            }
+
+            $originalName = $file->getClientOriginalName();
+            $mimeType = $file->getMimeType();
+            $size = $file->getSize();
         }
 
         try {
@@ -60,12 +87,12 @@ class VideoController extends Controller
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
                 'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
+                'original_name' => $originalName,
+                'mime_type' => $mimeType,
+                'size' => $size,
             ]);
         } catch (Throwable $exception) {
-            Storage::disk('public')->delete($path);
+            $this->cleanupFile($mediaStorage, $path);
 
             throw $exception;
         }
@@ -84,7 +111,7 @@ class VideoController extends Controller
         return view('videos.edit', compact('video'));
     }
 
-    public function update(Request $request, Video $video)
+    public function update(Request $request, Video $video, MediaStorage $mediaStorage)
     {
         if ($video->user_id !== Auth::id()) {
             abort(403);
@@ -94,6 +121,11 @@ class VideoController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'video' => ['nullable', 'file', 'mimes:mp4,mov,webm,mkv', 'max:30720'],
+            'blob_url' => ['nullable', 'url:https', 'max:2048'],
+            'blob_pathname' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
+            'blob_mime_type' => ['nullable', 'required_with:blob_url', 'in:video/mp4,video/quicktime,video/webm,video/x-matroska'],
+            'blob_size' => ['nullable', 'required_with:blob_url', 'integer', 'min:1', 'max:31457280'],
+            'blob_original_name' => ['nullable', 'required_with:blob_url', 'string', 'max:255'],
         ]);
 
         $data = [
@@ -103,7 +135,23 @@ class VideoController extends Controller
 
         $newPath = null;
 
-        if ($request->hasFile('video')) {
+        if ($request->filled('blob_url')) {
+            if (! $mediaStorage->isValidBlobUpload(
+                $validated['blob_url'],
+                $validated['blob_pathname'],
+                'videos',
+            )) {
+                throw ValidationException::withMessages([
+                    'video' => 'Hasil upload video baru tidak valid. Silakan coba lagi.',
+                ]);
+            }
+
+            $newPath = $validated['blob_url'];
+            $data['path'] = $newPath;
+            $data['original_name'] = $validated['blob_original_name'];
+            $data['mime_type'] = $validated['blob_mime_type'];
+            $data['size'] = (int) $validated['blob_size'];
+        } elseif ($request->hasFile('video')) {
             $file = $request->file('video');
 
             try {
@@ -132,14 +180,14 @@ class VideoController extends Controller
             $video->update($data);
         } catch (Throwable $exception) {
             if ($newPath !== null) {
-                Storage::disk('public')->delete($newPath);
+                $this->cleanupFile($mediaStorage, $newPath);
             }
 
             throw $exception;
         }
 
         if ($newPath !== null) {
-            Storage::disk('public')->delete($oldPath);
+            $this->cleanupFile($mediaStorage, $oldPath);
         }
 
         return redirect()
@@ -147,7 +195,7 @@ class VideoController extends Controller
             ->with('success', 'Video berhasil diperbarui.');
     }
 
-    public function destroy(Video $video)
+    public function destroy(Video $video, MediaStorage $mediaStorage)
     {
         if ($video->user_id !== Auth::id()) {
             abort(403);
@@ -155,10 +203,19 @@ class VideoController extends Controller
 
         $path = $video->path;
         $video->delete();
-        Storage::disk('public')->delete($path);
+        $this->cleanupFile($mediaStorage, $path);
 
         return redirect()
             ->route('videos.index')
             ->with('success', 'Video berhasil dihapus.');
+    }
+
+    private function cleanupFile(MediaStorage $mediaStorage, ?string $path): void
+    {
+        try {
+            $mediaStorage->delete($path);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

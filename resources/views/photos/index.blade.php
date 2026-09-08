@@ -356,7 +356,7 @@
                             class="relative block aspect-[4/3] w-full overflow-hidden text-left">
 
                             <img
-                                src="{{ asset('storage/' . $photo->path) }}"
+                                src="{{ $photo->url }}"
                                 alt="{{ $photo->title ?? 'Foto Kenangan' }}"
                                 class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                             >
@@ -677,7 +677,7 @@
         const photos = [
             @foreach ($photos ?? [] as $photo)
                 {
-                    image: @json(asset('storage/' . $photo->path)),
+                    image: @json($photo->url),
                     title: @json($photo->title ?? 'Foto Kenangan'),
                     description: @json($photo->description ?? 'Tidak ada deskripsi.'),
                     uploader: @json(optional($photo->user)->username ?? 'Unknown'),

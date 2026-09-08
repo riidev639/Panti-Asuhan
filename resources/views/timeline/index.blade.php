@@ -512,14 +512,14 @@
                             @if ($isPhoto)
 
                                 <a
-                                    href="{{ asset('storage/' . $memory['path']) }}"
+                                    href="{{ $memory['url'] }}"
                                     target="_blank"
                                     class="memory-media block aspect-video
                                            overflow-hidden rounded-xl
                                            bg-black/30"
                                 >
                                     <img
-                                        src="{{ asset('storage/' . $memory['path']) }}"
+                                        src="{{ $memory['url'] }}"
                                         class="h-full w-full object-cover"
                                         alt="{{ $memory['title'] ?? 'Foto Kenangan' }}"
                                     >
@@ -536,7 +536,7 @@
                                 >
 
                                     <video
-                                        src="{{ asset('storage/' . $memory['path']) }}"
+                                        src="{{ $memory['url'] }}"
                                         muted
                                         playsinline
                                         preload="metadata"
@@ -869,7 +869,7 @@
         const timelineVideos = [
             @foreach (collect($memories ?? [])->where('type', 'video')->values() as $memory)
                 {
-                    video: @json(asset('storage/' . $memory['path'])),
+                    video: @json($memory['url']),
                     title: @json($memory['title'] ?? 'Video Kenangan'),
                     description: @json($memory['description'] ?? 'Tidak ada deskripsi.'),
                     uploader: @json($memory['username'] ?? 'Unknown'),

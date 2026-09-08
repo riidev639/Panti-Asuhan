@@ -3,7 +3,8 @@
     "version": 2,
     "framework": null,
     "functions": {
-        "api/index.php": { "runtime": "vercel-php@0.7.4" }
+        "api/index.php": { "runtime": "vercel-php@0.7.4" },
+        "api/blob-upload.js": { "maxDuration": 10 }
     },
     "routes": [
         {
@@ -17,6 +18,10 @@
         {
             "src": "/favicon.ico",
             "dest": "/public/favicon.ico"
+        },
+        {
+            "src": "/api/blob-upload",
+            "dest": "/api/blob-upload.js"
         },
         {
             "src": "/(.*)",
