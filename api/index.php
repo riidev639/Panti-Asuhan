@@ -55,8 +55,11 @@ if (getenv('VERCEL') !== false) {
         'APP_ENV' => 'production',
         'APP_DEBUG' => 'false',
         'LARAVEL_STORAGE_PATH' => $storagePath,
-        'LOG_CHANNEL' => 'stderr',
-        'LOG_STACK' => 'stderr',
+        // The exception callback in bootstrap/app.php writes a concise message
+        // directly to stderr. Suppress Laravel's multi-kilobyte stack trace on
+        // Vercel because the platform keeps only its tail and hides the cause.
+        'LOG_CHANNEL' => 'null',
+        'LOG_STACK' => 'null',
         'CACHE_STORE' => 'array',
         'SESSION_DRIVER' => 'cookie',
         'SESSION_ENCRYPT' => 'true',
