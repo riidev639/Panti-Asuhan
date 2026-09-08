@@ -15,6 +15,21 @@ declare(strict_types=1);
 |
 */
 if (getenv('VERCEL') !== false) {
+    register_shutdown_function(static function (): void {
+        $error = error_get_last();
+
+        if ($error === null || ! in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+            return;
+        }
+
+        error_log(sprintf(
+            '[Laravel fatal] %s in %s:%d',
+            $error['message'],
+            $error['file'],
+            $error['line'],
+        ));
+    });
+
     $runtimeRoot = rtrim(sys_get_temp_dir(), '/\\').DIRECTORY_SEPARATOR.'panti-asuhan';
     $storagePath = $runtimeRoot.DIRECTORY_SEPARATOR.'storage';
     $bootstrapCachePath = $runtimeRoot.DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache';
