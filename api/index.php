@@ -101,7 +101,6 @@ if (getenv('VERCEL') !== false) {
             $kernel = $application->make(Illuminate\Contracts\Http\Kernel::class);
             $diagnosticRequest = Illuminate\Http\Request::create('/members', 'GET');
             $application->instance('request', $diagnosticRequest);
-            Illuminate\Http\Request::clearResolvedInstance();
             $kernel->bootstrap();
 
             $stage = 'database';
