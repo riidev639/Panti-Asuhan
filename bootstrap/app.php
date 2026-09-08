@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Keep the root cause visible in serverless logs before a long stack
         // trace is truncated by the hosting log viewer.
-        $exceptions->report(function (Throwable $exception): void {
+        $exceptions->report(function (Throwable $exception): false {
             error_log(sprintf(
                 '[Laravel exception] %s: %s in %s:%d',
                 $exception::class,
@@ -34,5 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 $exception->getFile(),
                 $exception->getLine(),
             ));
+
+            // The concise line above is the complete production report. A
+            // second full stack trace can exceed Vercel's per-log limit and
+            // hide the actual exception message.
+            return false;
         });
     })->create();
