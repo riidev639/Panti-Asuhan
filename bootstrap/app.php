@@ -14,15 +14,5 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->report(function (Throwable $exception): void {
-            if (getenv('VERCEL') === false) {
-                return;
-            }
-
-            error_log(sprintf(
-                '[Laravel exception] %s: %s',
-                $exception::class,
-                $exception->getMessage(),
-            ));
-        });
+        //
     })->create();
