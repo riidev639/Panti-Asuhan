@@ -54,6 +54,7 @@ if (getenv('VERCEL') !== false) {
     $runtimeEnvironment = [
         'APP_ENV' => 'production',
         'APP_DEBUG' => 'false',
+        'APP_NAME' => 'Panti Asuhan',
         'LARAVEL_STORAGE_PATH' => $storagePath,
         'LOG_CHANNEL' => 'stderr',
         'LOG_STACK' => 'stderr',
@@ -61,6 +62,13 @@ if (getenv('VERCEL') !== false) {
         'APP_MAINTENANCE_DRIVER' => 'file',
         'SESSION_DRIVER' => 'cookie',
         'SESSION_ENCRYPT' => 'true',
+        'SESSION_LIFETIME' => '120',
+        'SESSION_EXPIRE_ON_CLOSE' => 'false',
+        'SESSION_COOKIE' => 'panti_asuhan_session',
+        'SESSION_PATH' => '/',
+        'SESSION_SECURE_COOKIE' => 'true',
+        'SESSION_HTTP_ONLY' => 'true',
+        'SESSION_SAME_SITE' => 'lax',
         'VIEW_COMPILED_PATH' => $storagePath.DIRECTORY_SEPARATOR.'framework'.DIRECTORY_SEPARATOR.'views',
     ];
 
